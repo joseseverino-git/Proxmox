@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotlight on Proxmox VE - Enterprise Diagnostics</title>
+  <link rel="stylesheet" href="/static/css/spotlight.css">
+  <!-- Lucide Icons CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.344.0/font/lucide.min.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Spotlight Header -->
+    <header class="spotlight-header">
+      <div class="brand-section">
+        <div class="brand-icon">S</div>
+        <div class="brand-titles">
+          <h1>
+            Spotlight <span style="font-weight:400;color:var(--spotlight-cyan);font-size:14px;">PROXMOX VE</span>
+          </h1>
+          <div class="subtitle" id="cluster-title">Cargando telemetría del servidor...</div>
+        </div>
+        <div id="connection-status-pill" class="conn-status-pill demo" title="Estado de la conexión">
+          <span class="pulse-dot"></span> CONECTANDO...
+        </div>
+      </div>
+
+      <!-- Center Navigation Tabs -->
+      <nav class="nav-tabs">
+        <button class="nav-btn active" data-view="executive">
+          <i class="lucide-layout-dashboard"></i> Vista Ejecutiva
+        </button>
+        <button class="nav-btn" data-view="technical">
+          <i class="lucide-cpu"></i> Vista Técnica
+        </button>
+        <button class="nav-btn" data-view="alarms">
+          <i class="lucide-bell"></i> Alarmas y Logs
+        </button>
+      </nav>
+
+      <!-- Right Controls -->
+      <div class="header-controls">
+        <button id="btn-open-troubleshoot" class="action-btn action-btn-troubleshoot" title="Diagnóstico y Troubleshooting de la Plataforma">
+          <i class="lucide-activity"></i> Troubleshooting
+        </button>
+        <button id="btn-open-config" class="action-btn action-btn-config" title="Configurar conexión con Proxmox VE">
+          <i class="lucide-settings"></i> Configuración
+        </button>
+        <select id="refresh-interval-select" class="refresh-select" title="Intervalo de actualización automática">
+          <option value="5000" selected>Auto: 5s</option>
+          <option value="10000">Auto: 10s</option>
+          <option value="30000">Auto: 30s</option>
+          <option value="60000">Auto: 60s</option>
+          <option value="0">Pausado</option>
+        </select>
+        <button id="manual-refresh-btn" class="action-btn" title="Forzar Actualización Ahora">
+          <i id="refresh-icon" class="lucide-refresh-cw"></i> Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Global Connection Alert Banner (Shown if disconnected or unconfigured) -->
+    <div id="connection-alert-banner" class="conn-alert-banner" style="display:none;">
+      <div class="conn-alert-content">
+        <i class="lucide-alert-triangle alert-icon"></i>
+        <div class="alert-text">
+          <strong id="alert-banner-title">Sin conexión con Proxmox VE:</strong>
+          <span id="alert-banner-msg">No se puede comunicar con la API de Proxmox.</span>
+        </div>
+      </div>
+      <div class="conn-alert-actions">
+        <button class="banner-btn banner-btn-troubleshoot" id="banner-btn-troubleshoot">
+          <i class="lucide-activity"></i> Diagnosticar
+        </button>
+        <button class="banner-btn banner-btn-config" id="banner-btn-config">
+          <i class="lucide-settings"></i> Configurar
+        </button>
+      </div>
+    </div>
+
+    <!-- Spotlight Alarm & Health Strip -->
+    <section class="alarm-strip">
+      <div class="alarm-counters">
+        <div class="alarm-badge critical" title="Alarmas Críticas">
+          <span>CRITICAL</span>
+          <span class="count" id="count-critical">0</span>
+        </div>
+        <div class="alarm-badge high" title="Alarmas Altas">
+          <span>HIGH</span>
+          <span class="count" id="count-high">0</span>
+        </div>
+        <div class="alarm-badge medium" title="Alarmas Medias">
+          <span>MEDIUM</span>
+          <span class="count" id="count-medium">0</span>
+        </div>
+        <div class="alarm-badge low" title="Alarmas Bajas / Info">
+          <span>LOW</span>
+          <span class="count" id="count-low">0</span>
+        </div>
+        <div class="alarm-badge normal" title="Componentes Normales">
+          <span>NORMAL</span>
+          <span class="count" id="count-normal">0</span>
+        </div>
+      </div>
+
+      <div class="cluster-meta-strip">
+        <div class="meta-item">
+          <span>PVE:</span> <strong id="meta-pve-version">-</strong>
+        </div>
+        <div class="meta-item">
+          <span>Nodos:</span> <strong id="meta-nodes-count">-</strong>
+        </div>
+        <div class="meta-item">
+          <span>VMs:</span> <strong id="meta-vms-count">-</strong>
+        </div>
+        <div class="meta-item">
+          <span>LXC:</span> <strong id="meta-lxc-count">-</strong>
+        </div>
+      </div>
+
+      <div id="health-score-container" class="health-score-pill healthy">
+        <span>HEALTH:</span> <strong>100/100</strong> (HEALTHY)
+      </div>
+    </section>
+
+    <!-- Main View Content Area -->
+    <main id="view-content-area" class="main-content">
+      <div style="text-align:center;padding:60px;color:var(--text-secondary);">
+        <i class="lucide-loader-2 spin" style="font-size:32px;color:var(--spotlight-cyan);"></i>
+        <div style="margin-top:12px;font-size:14px;">Inicializando Spotlight Telemetry Dashboard...</div>
+      </div>
+    </main>
+
+    <!-- Guest Drilldown Modal -->
+    <div id="guest-modal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-guest-title">Detalles de la Carga de Trabajo</div>
+          <button class="modal-close-btn" id="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-guest-body">
+          <!-- Dynamic details injected here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- ⚙️ VENTANA DE CONFIGURACIÓN DEL APLICATIVO                        -->
+    <!-- ================================================================= -->
+    <div id="config-modal" class="modal-overlay">
+      <div class="modal-box modal-box-large">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="lucide-settings" style="color:var(--spotlight-cyan);margin-right:8px;"></i>
+            Configuración de Proxmox VE y Plataforma
+          </div>
+          <button class="modal-close-btn" id="config-modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="config-form" class="config-form" onsubmit="return false;">
+            
+            <div class="config-section">
+              <div class="config-section-title">
+                <i class="lucide-server"></i> 1. Servidor Proxmox VE (PVE Host)
+              </div>
+              <div class="form-group">
+                <label for="cfg-host">Dirección URL o IP del Nodo/Clúster PVE:</label>
+                <div class="input-with-hint">
+                  <input type="text" id="cfg-host" name="PVE_HOST" placeholder="https://192.168.1.100:8006" required>
+                  <span class="field-hint">Incluye el puerto 8006 (ej: https://192.168.1.50:8006). Si omites https:// se agregará automáticamente.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="config-section">
+              <div class="config-section-title">
+                <i class="lucide-key"></i> 2. Método de Autenticación
+              </div>
+              
+              <div class="auth-type-selector">
+                <label class="auth-radio-card">
+                  <input type="radio" name="AUTH_TYPE" value="token" id="auth-type-token" checked>
+                  <div class="radio-card-content">
+                    <strong><i class="lucide-shield-check"></i> API Token (Recomendado)</strong>
+                    <span>Ideal para monitoreo dedicado con usuario de auditoría (ej: monitoring@pve!spotlight).</span>
+                  </div>
+                </label>
+                <label class="auth-radio-card">
+                  <input type="radio" name="AUTH_TYPE" value="password" id="auth-type-password">
+                  <div class="radio-card-content">
+                    <strong><i class="lucide-lock"></i> Usuario y Contraseña (Ticket PVE)</strong>
+                    <span>Útil si prefieres usar credenciales directas de Proxmox (ej: root@pam).</span>
+                  </div>
+                </label>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="cfg-user">Usuario y Reino (PVE_USER):</label>
+                  <input type="text" id="cfg-user" name="PVE_USER" placeholder="monitoring@pve o root@pam" required>
+                  <span class="field-hint">Debe incluir el realm: <code>@pve</code> (usuarios locales PVE) o <code>@pam</code> (usuarios del sistema Linux).</span>
+                </div>
+              </div>
+
+              <!-- Token Fields Container -->
+              <div id="token-fields-group" class="auth-fields-group">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="cfg-token-name">Nombre del Token (Token ID):</label>
+                    <input type="text" id="cfg-token-name" name="PVE_TOKEN_NAME" placeholder="spotlight">
+                    <span class="field-hint">Nombre asignado al crear el API Token en Proxmox.</span>
+                  </div>
+                  <div class="form-group">
+                    <label for="cfg-token-value">Secret UUID del Token (PVE_TOKEN_VALUE):</label>
+                    <div class="input-password-wrapper">
+                      <input type="password" id="cfg-token-value" name="PVE_TOKEN_VALUE" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                      <button type="button" class="toggle-password-btn" data-target="cfg-token-value" title="Mostrar/Ocultar">
+                        <i class="lucide-eye"></i>
+                      </button>
+                    </div>
+                    <span class="field-hint" id="token-status-hint">UUID generado en Datacenter -> Permissions -> API Tokens.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Password Fields Container -->
+              <div id="password-fields-group" class="auth-fields-group" style="display:none;">
+                <div class="form-group">
+                  <label for="cfg-password">Contraseña de Proxmox VE (PVE_PASSWORD):</label>
+                  <div class="input-password-wrapper">
+                    <input type="password" id="cfg-password" name="PVE_PASSWORD" placeholder="••••••••••••">
+                    <button type="button" class="toggle-password-btn" data-target="cfg-password" title="Mostrar/Ocultar">
+                      <i class="lucide-eye"></i>
+                    </button>
+                  </div>
+                  <span class="field-hint" id="password-status-hint">Contraseña del usuario en Proxmox VE.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="config-section">
+              <div class="config-section-title">
+                <i class="lucide-sliders"></i> 3. Modo de Operación y Seguridad
+              </div>
+              <div class="checkbox-grid">
+                <label class="checkbox-container">
+                  <input type="checkbox" id="cfg-verify-ssl" name="PVE_VERIFY_SSL">
+                  <span class="checkmark"></span>
+                  <div class="checkbox-text">
+                    <strong>Verificar Certificado SSL (PVE_VERIFY_SSL)</strong>
+                    <span class="field-hint">Desmárcalo si Proxmox usa el certificado autofirmado predeterminado (muy común).</span>
+                  </div>
+                </label>
+
+                <label class="checkbox-container">
+                  <input type="checkbox" id="cfg-demo-mode" name="DEMO_MODE">
+                  <span class="checkmark"></span>
+                  <div class="checkbox-text">
+                    <strong>Forzar Modo Demostración (DEMO_MODE)</strong>
+                    <span class="field-hint">Muestra datos sintéticos simulados sin conectarse a ningún servidor real.</span>
+                  </div>
+                </label>
+
+                <label class="checkbox-container">
+                  <input type="checkbox" id="cfg-fallback-demo" name="FALLBACK_TO_DEMO">
+                  <span class="checkmark"></span>
+                  <div class="checkbox-text">
+                    <strong>Fallback a Demo si falla la conexión</strong>
+                    <span class="field-hint">Si está desactivado (recomendado), la plataforma te avisará del fallo exacto en lugar de mostrar datos falsos.</span>
+                  </div>
+                </label>
+              </div>
+
+              <div class="form-row" style="margin-top:12px;">
+                <div class="form-group" style="max-width:200px;">
+                  <label for="cfg-timeout">Timeout API (segundos):</label>
+                  <input type="number" id="cfg-timeout" name="PVE_TIMEOUT" min="1" max="60" step="0.5" value="6.0">
+                </div>
+              </div>
+            </div>
+
+            <!-- Feedback Alert Box inside modal -->
+            <div id="config-feedback-alert" class="config-feedback" style="display:none;"></div>
+
+            <div class="modal-actions-bar">
+              <button type="button" id="btn-test-connection" class="action-btn action-btn-test">
+                <i id="test-conn-icon" class="lucide-activity"></i> Probar Conexión Ahora
+              </button>
+              <div style="display:flex;gap:8px;">
+                <button type="button" id="btn-cancel-config" class="action-btn action-btn-cancel">
+                  Cancelar
+                </button>
+                <button type="button" id="btn-save-config" class="action-btn action-btn-save">
+                  <i class="lucide-save"></i> Guardar y Aplicar
+                </button>
+              </div>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 🩺 VENTANA DE TROUBLESHOOTING & DIAGNÓSTICO SRE                   -->
+    <!-- ================================================================= -->
+    <div id="troubleshoot-modal" class="modal-overlay">
+      <div class="modal-box modal-box-large">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="lucide-activity" style="color:var(--alarm-high);margin-right:8px;"></i>
+            Centro de Troubleshooting & Diagnóstico SRE
+          </div>
+          <button class="modal-close-btn" id="troubleshoot-modal-close-btn">&times;</button>
+        </div>
+
+        <!-- Troubleshooting Navigation Tabs -->
+        <div class="troubleshoot-subnav">
+          <button class="tb-tab-btn active" data-tab="tb-audit">
+            <i class="lucide-check-circle"></i> 1. Diagnóstico Automatizado
+          </button>
+          <button class="tb-tab-btn" data-tab="tb-remediation">
+            <i class="lucide-terminal"></i> 2. Guía y Comandos de Remediación
+          </button>
+          <button class="tb-tab-btn" data-tab="tb-logs">
+            <i class="lucide-file-text"></i> 3. Visor de Logs del Servidor
+          </button>
+        </div>
+
+        <div class="modal-body">
+          
+          <!-- TAB 1: Diagnóstico Automatizado -->
+          <div id="tb-audit-tab" class="tb-tab-content active">
+            <div class="tb-toolbar">
+              <div>
+                <strong style="color:var(--text-bright);font-size:14px;">Auditoría de las 6 Capas de Integración</strong>
+                <div style="font-size:12px;color:var(--text-secondary);">
+                  Host destino: <code id="tb-target-host">-</code> | Usuario: <code id="tb-target-user">-</code>
+                </div>
+              </div>
+              <button id="btn-run-full-diagnostics" class="action-btn action-btn-run-diag">
+                <i id="diag-run-icon" class="lucide-play"></i> Ejecutar Diagnóstico Completo
+              </button>
+            </div>
+
+            <!-- Summary metrics -->
+            <div id="tb-summary-cards" class="tb-summary-cards" style="display:none;">
+              <div class="tb-stat-badge" id="tb-stat-total">Total: <strong>6</strong></div>
+              <div class="tb-stat-badge pass" id="tb-stat-passed">Pasadas: <strong>0</strong></div>
+              <div class="tb-stat-badge warn" id="tb-stat-warn">Advertencias: <strong>0</strong></div>
+              <div class="tb-stat-badge fail" id="tb-stat-failed">Fallos: <strong>0</strong></div>
+            </div>
+
+            <!-- Remediation alert banner if failed -->
+            <div id="tb-remediation-alert" class="tb-remediation-box" style="display:none;"></div>
+
+            <!-- Stages Grid -->
+            <div id="tb-stages-container" class="tb-stages-container">
+              <div class="tb-empty-notice">
+                <i class="lucide-activity spin" style="font-size:32px;color:var(--spotlight-cyan);"></i>
+                <p style="margin-top:10px;">Presiona <strong>"Ejecutar Diagnóstico Completo"</strong> para auditar la red, SSL, API de Proxmox y permisos en tiempo real.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: Guía de Remediación y Comandos CLI -->
+          <div id="tb-remediation-tab" class="tb-tab-content">
+            <div class="remediation-guide-header">
+              <h3><i class="lucide-terminal"></i> Comandos Rápidos de Solución en Proxmox VE</h3>
+              <p>Ejecuta estos comandos en la terminal Shell de tu nodo Proxmox VE (como <code>root</code> o con <code>sudo</code>) para garantizar que el usuario y token de monitoreo estén configurados correctamente:</p>
+            </div>
+
+            <div class="command-card">
+              <div class="command-card-header">
+                <span class="step-num">1</span>
+                <strong>Crear el usuario de monitoreo en Proxmox</strong>
+                <button class="copy-cmd-btn" data-code="pveum user add monitoring@pve --comment 'Spotlight Dashboard'"><i class="lucide-copy"></i> Copiar</button>
+              </div>
+              <pre class="cli-block"><code>pveum user add monitoring@pve --comment "Spotlight Dashboard"</code></pre>
+            </div>
+
+            <div class="command-card">
+              <div class="command-card-header">
+                <span class="step-num">2</span>
+                <strong>Asignar el rol de sólo lectura (PVEAuditor) en la raíz '/'</strong>
+                <button class="copy-cmd-btn" data-code="pveum acl modify / -user monitoring@pve -role PVEAuditor"><i class="lucide-copy"></i> Copiar</button>
+              </div>
+              <pre class="cli-block"><code>pveum acl modify / -user monitoring@pve -role PVEAuditor</code></pre>
+              <div class="command-note">El rol PVEAuditor otorga visibilidad total sobre Nodos, VMs, LXCs y Almacenamientos sin conceder permisos de escritura ni alteración.</div>
+            </div>
+
+            <div class="command-card">
+              <div class="command-card-header">
+                <span class="step-num">3</span>
+                <strong>Generar el API Token 'spotlight' (sin separación de privilegios)</strong>
+                <button class="copy-cmd-btn" data-code="pveum user token add monitoring@pve spotlight --privsep 0"><i class="lucide-copy"></i> Copiar</button>
+              </div>
+              <pre class="cli-block"><code>pveum user token add monitoring@pve spotlight --privsep 0</code></pre>
+              <div class="command-note">⚠️ Copia el código UUID que Proxmox muestra en la columna <code>value</code>. Pégalo en la ventana de <strong>Configuración</strong> de este Dashboard.</div>
+            </div>
+
+            <div class="command-card">
+              <div class="command-card-header">
+                <span class="step-num">4</span>
+                <strong>Verificar conectividad por curl desde la terminal</strong>
+                <button class="copy-cmd-btn" data-code="curl -k -H 'Authorization: PVEAPIToken=monitoring@pve!spotlight=TU_TOKEN_UUID' https://192.168.1.100:8006/api2/json/version"><i class="lucide-copy"></i> Copiar</button>
+              </div>
+              <pre class="cli-block"><code>curl -k -H "Authorization: PVEAPIToken=monitoring@pve!spotlight=TU_TOKEN_UUID" https://192.168.1.100:8006/api2/json/version</code></pre>
+            </div>
+
+            <div class="command-card">
+              <div class="command-card-header">
+                <span class="step-num">5</span>
+                <strong>Verificar el servicio web de la API y Firewall en Proxmox</strong>
+                <button class="copy-cmd-btn" data-code="systemctl status pveproxy && pve-firewall status"><i class="lucide-copy"></i> Copiar</button>
+              </div>
+              <pre class="cli-block"><code>systemctl status pveproxy && pve-firewall status</code></pre>
+            </div>
+          </div>
+
+          <!-- TAB 3: Visor de Logs del Servidor -->
+          <div id="tb-logs-tab" class="tb-tab-content">
+            <div class="logs-toolbar">
+              <div class="logs-filter-group">
+                <label for="log-level-filter">Filtrar por nivel:</label>
+                <select id="log-level-filter" class="refresh-select">
+                  <option value="" selected>Todos los niveles</option>
+                  <option value="ERROR">Errores (ERROR)</option>
+                  <option value="WARNING">Advertencias (WARN)</option>
+                  <option value="INFO">Informativos (INFO)</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button id="btn-refresh-logs" class="action-btn" title="Recargar logs">
+                  <i class="lucide-refresh-cw"></i> Recargar
+                </button>
+                <button id="btn-copy-logs" class="action-btn" title="Copiar logs al portapapeles">
+                  <i class="lucide-copy"></i> Copiar Logs
+                </button>
+                <button id="btn-clear-logs" class="action-btn action-btn-cancel" title="Limpiar buffer de logs">
+                  <i class="lucide-trash-2"></i> Limpiar
+                </button>
+              </div>
+            </div>
+
+            <div id="logs-console-box" class="logs-console">
+              <div class="log-entry log-info">[INFO] Visor de logs inicializado. Obteniendo registros del servidor...</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Spotlight Footer -->
+    <footer class="spotlight-footer">
+      <div>Spotlight on Proxmox VE • Self-Contained Docker Monitoring • Enterprise SRE Diagnostics</div>
+      <div>Quest Spotlight Theme v1.1 • Diseñado para Raspberry Pi 4 B (ARM64) & Debian</div>
+    </footer>
+
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+services:
+  proxmox-spotlight-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proxmox-spotlight-dashboard
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PVE_HOST=${PVE_HOST:-https://192.168.1.100:8006}
+      - AUTH_TYPE=${AUTH_TYPE:-token}
+      - PVE_USER=${PVE_USER:-monitoring@pve}
+      - PVE_TOKEN_NAME=${PVE_TOKEN_NAME:-spotlight}
+      - PVE_TOKEN_VALUE=${PVE_TOKEN_VALUE:-}
+      - PVE_PASSWORD=${PVE_PASSWORD:-}
+      - PVE_VERIFY_SSL=${PVE_VERIFY_SSL:-false}
+      - PVE_TIMEOUT=${PVE_TIMEOUT:-6.0}
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-5}
+      - DEMO_MODE=${DEMO_MODE:-false}
+      - FALLBACK_TO_DEMO=${FALLBACK_TO_DEMO:-false}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
