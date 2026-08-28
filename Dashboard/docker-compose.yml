@@ -19,6 +19,14 @@ services:
       - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-5}
       - DEMO_MODE=${DEMO_MODE:-false}
       - FALLBACK_TO_DEMO=${FALLBACK_TO_DEMO:-false}
+      - ALERT_EMAIL_ENABLED=${ALERT_EMAIL_ENABLED:-false}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-apps.monitor.lnx@gmail.com}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-uoilwckixdoemkfo}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      - ALERT_COOLDOWN_MINUTES=${ALERT_COOLDOWN_MINUTES:-30}
     volumes:
       - ./data:/app/data
     healthcheck:

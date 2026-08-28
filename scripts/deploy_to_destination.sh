@@ -285,6 +285,14 @@ else
     append_var "AUTH_TYPE" "token"
     append_var "PVE_PASSWORD" ""
     append_var "FALLBACK_TO_DEMO" "false"
+    append_var "ALERT_EMAIL_ENABLED" "false"
+    append_var "ALERT_EMAIL_TO" ""
+    append_var "SMTP_HOST" "smtp.gmail.com"
+    append_var "SMTP_PORT" "587"
+    append_var "SMTP_USER" "apps.monitor.lnx@gmail.com"
+    append_var "SMTP_PASSWORD" "uoilwckixdoemkfo"
+    append_var "SMTP_USE_TLS" "true"
+    append_var "ALERT_COOLDOWN_MINUTES" "30"
 
     # Forzar que FALLBACK_TO_DEMO no esté en true para no engañar al operador con datos demo
     if grep -q "^[[:space:]]*FALLBACK_TO_DEMO=true" "$ENV_TARGET"; then

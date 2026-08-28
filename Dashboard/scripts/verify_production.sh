@@ -112,6 +112,9 @@ load_env_vars() {
             PORT) PORT="$value" ;;
             DEMO_MODE) DEMO_MODE="$value" ;;
             FALLBACK_TO_DEMO) FALLBACK_TO_DEMO="$value" ;;
+            ALERT_EMAIL_ENABLED) ALERT_EMAIL_ENABLED="$value" ;;
+            ALERT_EMAIL_TO) ALERT_EMAIL_TO="$value" ;;
+            SMTP_USER) SMTP_USER="$value" ;;
         esac
     done < "$env_path"
 }
@@ -183,6 +186,18 @@ else
             TOKEN_MASKED="${PVE_TOKEN_VALUE:0:6}******${PVE_TOKEN_VALUE: -4}"
             test_pass "Token Proxmox configurado: ${CYAN}${PVE_USER}!${PVE_TOKEN_NAME}=${TOKEN_MASKED}${NC}"
         fi
+    fi
+
+    # Validar Alertas por Correo
+    if [[ "${ALERT_EMAIL_ENABLED,,}" == "true" ]]; then
+        if [[ -n "$ALERT_EMAIL_TO" ]]; then
+            test_pass "Alertas por correo activadas hacia: ${CYAN}${ALERT_EMAIL_TO}${NC} (vía ${SMTP_USER:-apps.monitor.lnx@gmail.com})"
+        else
+            test_warn "Alertas por correo activadas (ALERT_EMAIL_ENABLED=true) pero sin correo de destino (ALERT_EMAIL_TO)." \
+                "Configura el correo de destino en la ventana '⚙ Configuración'."
+        fi
+    else
+        test_pass "Envío de alertas por correo desactivado o en espera de configuración (opcional)."
     fi
 
     # Validar formato de URL

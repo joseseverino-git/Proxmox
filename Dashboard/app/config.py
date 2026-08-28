@@ -45,12 +45,22 @@ class Settings(BaseSettings):
     DEMO_MODE: bool = False
     FALLBACK_TO_DEMO: bool = False  # If false, show offline/error state when PVE is down instead of fake demo data
 
+    # --- Email Alert Settings (Gmail SMTP) ---
+    ALERT_EMAIL_ENABLED: bool = False
+    ALERT_EMAIL_TO: str = ""
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = "apps.monitor.lnx@gmail.com"
+    SMTP_PASSWORD: str = "uoilwckixdoemkfo"
+    SMTP_USE_TLS: bool = True
+    ALERT_COOLDOWN_MINUTES: int = 30
+
     class Config:
         env_file = find_env_path()
         env_file_encoding = "utf-8"
         extra = "ignore"
 
-    @field_validator("PVE_VERIFY_SSL", "DEMO_MODE", "FALLBACK_TO_DEMO", mode="before")
+    @field_validator("PVE_VERIFY_SSL", "DEMO_MODE", "FALLBACK_TO_DEMO", "ALERT_EMAIL_ENABLED", "SMTP_USE_TLS", mode="before")
     @classmethod
     def parse_bool_fields(cls, v: Any) -> bool:
         if isinstance(v, bool):
@@ -99,6 +109,7 @@ class Settings(BaseSettings):
                 masked_token = "••••••••"
 
         has_password = bool(self.PVE_PASSWORD and self.PVE_PASSWORD.strip())
+        has_smtp_password = bool(self.SMTP_PASSWORD and self.SMTP_PASSWORD.strip())
 
         return {
             "pve_host": self.PVE_HOST,
@@ -113,7 +124,18 @@ class Settings(BaseSettings):
             "cache_ttl": self.CACHE_TTL_SECONDS,
             "demo_mode": self.DEMO_MODE,
             "fallback_to_demo": self.FALLBACK_TO_DEMO,
-            "is_configured": self.is_configured
+            "is_configured": self.is_configured,
+
+            # Email Alert Settings
+            "alert_email_enabled": self.ALERT_EMAIL_ENABLED,
+            "alert_email_to": self.ALERT_EMAIL_TO,
+            "smtp_host": self.SMTP_HOST,
+            "smtp_port": self.SMTP_PORT,
+            "smtp_user": self.SMTP_USER,
+            "has_smtp_password": has_smtp_password,
+            "smtp_password_masked": ("••••••••" if has_smtp_password else ""),
+            "smtp_use_tls": self.SMTP_USE_TLS,
+            "alert_cooldown_minutes": self.ALERT_COOLDOWN_MINUTES
         }
 
     def update_and_persist(self, new_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -151,6 +173,31 @@ class Settings(BaseSettings):
         if "FALLBACK_TO_DEMO" in new_data:
             self.FALLBACK_TO_DEMO = self.parse_bool_fields(new_data["FALLBACK_TO_DEMO"])
 
+        # --- Email Alert Settings ---
+        if "ALERT_EMAIL_ENABLED" in new_data:
+            self.ALERT_EMAIL_ENABLED = self.parse_bool_fields(new_data["ALERT_EMAIL_ENABLED"])
+        if "ALERT_EMAIL_TO" in new_data:
+            self.ALERT_EMAIL_TO = str(new_data["ALERT_EMAIL_TO"]).strip()
+        if "SMTP_HOST" in new_data and new_data["SMTP_HOST"]:
+            self.SMTP_HOST = str(new_data["SMTP_HOST"]).strip()
+        if "SMTP_PORT" in new_data and new_data["SMTP_PORT"]:
+            try:
+                self.SMTP_PORT = int(new_data["SMTP_PORT"])
+            except (ValueError, TypeError):
+                pass
+        if "SMTP_USER" in new_data and new_data["SMTP_USER"]:
+            self.SMTP_USER = str(new_data["SMTP_USER"]).strip()
+        if "SMTP_PASSWORD" in new_data and new_data["SMTP_PASSWORD"] and new_data["SMTP_PASSWORD"].strip():
+            if not new_data["SMTP_PASSWORD"].startswith("••"):
+                self.SMTP_PASSWORD = str(new_data["SMTP_PASSWORD"]).strip()
+        if "SMTP_USE_TLS" in new_data:
+            self.SMTP_USE_TLS = self.parse_bool_fields(new_data["SMTP_USE_TLS"])
+        if "ALERT_COOLDOWN_MINUTES" in new_data and new_data["ALERT_COOLDOWN_MINUTES"]:
+            try:
+                self.ALERT_COOLDOWN_MINUTES = max(1, int(new_data["ALERT_COOLDOWN_MINUTES"]))
+            except (ValueError, TypeError):
+                pass
+
         # 2. Persist to data/settings.json
         try:
             persisted_file = get_persisted_settings_path()
@@ -165,7 +212,15 @@ class Settings(BaseSettings):
                 "PVE_TIMEOUT": self.PVE_TIMEOUT,
                 "CACHE_TTL_SECONDS": self.CACHE_TTL_SECONDS,
                 "DEMO_MODE": self.DEMO_MODE,
-                "FALLBACK_TO_DEMO": self.FALLBACK_TO_DEMO
+                "FALLBACK_TO_DEMO": self.FALLBACK_TO_DEMO,
+                "ALERT_EMAIL_ENABLED": self.ALERT_EMAIL_ENABLED,
+                "ALERT_EMAIL_TO": self.ALERT_EMAIL_TO,
+                "SMTP_HOST": self.SMTP_HOST,
+                "SMTP_PORT": self.SMTP_PORT,
+                "SMTP_USER": self.SMTP_USER,
+                "SMTP_PASSWORD": self.SMTP_PASSWORD,
+                "SMTP_USE_TLS": self.SMTP_USE_TLS,
+                "ALERT_COOLDOWN_MINUTES": self.ALERT_COOLDOWN_MINUTES
             }
             with open(persisted_file, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2)
@@ -205,6 +260,22 @@ class Settings(BaseSettings):
                                 lines.append(f"DEMO_MODE={str(self.DEMO_MODE).lower()}\n")
                             elif k == "FALLBACK_TO_DEMO":
                                 lines.append(f"FALLBACK_TO_DEMO={str(self.FALLBACK_TO_DEMO).lower()}\n")
+                            elif k == "ALERT_EMAIL_ENABLED":
+                                lines.append(f"ALERT_EMAIL_ENABLED={str(self.ALERT_EMAIL_ENABLED).lower()}\n")
+                            elif k == "ALERT_EMAIL_TO":
+                                lines.append(f"ALERT_EMAIL_TO={self.ALERT_EMAIL_TO}\n")
+                            elif k == "SMTP_HOST":
+                                lines.append(f"SMTP_HOST={self.SMTP_HOST}\n")
+                            elif k == "SMTP_PORT":
+                                lines.append(f"SMTP_PORT={self.SMTP_PORT}\n")
+                            elif k == "SMTP_USER":
+                                lines.append(f"SMTP_USER={self.SMTP_USER}\n")
+                            elif k == "SMTP_PASSWORD":
+                                lines.append(f"SMTP_PASSWORD={self.SMTP_PASSWORD}\n")
+                            elif k == "SMTP_USE_TLS":
+                                lines.append(f"SMTP_USE_TLS={str(self.SMTP_USE_TLS).lower()}\n")
+                            elif k == "ALERT_COOLDOWN_MINUTES":
+                                lines.append(f"ALERT_COOLDOWN_MINUTES={self.ALERT_COOLDOWN_MINUTES}\n")
                             else:
                                 lines.append(line)
                         else:
@@ -221,7 +292,15 @@ class Settings(BaseSettings):
                 "PVE_VERIFY_SSL": str(self.PVE_VERIFY_SSL).lower(),
                 "PVE_TIMEOUT": str(self.PVE_TIMEOUT),
                 "DEMO_MODE": str(self.DEMO_MODE).lower(),
-                "FALLBACK_TO_DEMO": str(self.FALLBACK_TO_DEMO).lower()
+                "FALLBACK_TO_DEMO": str(self.FALLBACK_TO_DEMO).lower(),
+                "ALERT_EMAIL_ENABLED": str(self.ALERT_EMAIL_ENABLED).lower(),
+                "ALERT_EMAIL_TO": self.ALERT_EMAIL_TO,
+                "SMTP_HOST": self.SMTP_HOST,
+                "SMTP_PORT": str(self.SMTP_PORT),
+                "SMTP_USER": self.SMTP_USER,
+                "SMTP_PASSWORD": self.SMTP_PASSWORD,
+                "SMTP_USE_TLS": str(self.SMTP_USE_TLS).lower(),
+                "ALERT_COOLDOWN_MINUTES": str(self.ALERT_COOLDOWN_MINUTES)
             }
             for k, v in to_append.items():
                 if k not in existing_keys:
@@ -246,10 +325,12 @@ if os.path.exists(persisted_path):
             saved_cfg = json.load(pf)
             for key, val in saved_cfg.items():
                 if hasattr(settings, key) and val is not None:
-                    if key in ("PVE_VERIFY_SSL", "DEMO_MODE", "FALLBACK_TO_DEMO"):
+                    if key in ("PVE_VERIFY_SSL", "DEMO_MODE", "FALLBACK_TO_DEMO", "ALERT_EMAIL_ENABLED", "SMTP_USE_TLS"):
                         setattr(settings, key, settings.parse_bool_fields(val))
                     elif key == "PVE_TIMEOUT":
                         setattr(settings, key, float(val))
+                    elif key in ("SMTP_PORT", "ALERT_COOLDOWN_MINUTES"):
+                        setattr(settings, key, int(val))
                     else:
                         setattr(settings, key, val)
         logger.info(f"Loaded persistent configuration from {persisted_path}")

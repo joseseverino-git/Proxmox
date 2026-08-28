@@ -177,6 +177,14 @@ append_if_missing() {
 append_if_missing "AUTH_TYPE" "token"
 append_if_missing "PVE_PASSWORD" ""
 append_if_missing "FALLBACK_TO_DEMO" "false"
+append_if_missing "ALERT_EMAIL_ENABLED" "false"
+append_if_missing "ALERT_EMAIL_TO" ""
+append_if_missing "SMTP_HOST" "smtp.gmail.com"
+append_if_missing "SMTP_PORT" "587"
+append_if_missing "SMTP_USER" "apps.monitor.lnx@gmail.com"
+append_if_missing "SMTP_PASSWORD" "uoilwckixdoemkfo"
+append_if_missing "SMTP_USE_TLS" "true"
+append_if_missing "ALERT_COOLDOWN_MINUTES" "30"
 
 # Asegurar que FALLBACK_TO_DEMO sea false para no esconder errores con datos demo falsos
 if grep -q "^[[:space:]]*FALLBACK_TO_DEMO=true" "$ENV_FILE"; then

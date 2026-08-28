@@ -969,6 +969,37 @@ async function openConfigModal() {
     const timeoutInput = document.getElementById('cfg-timeout');
     if (timeoutInput) timeoutInput.value = cfg.timeout || 6.0;
 
+    // Email alert settings
+    const emailAlertCb = document.getElementById('cfg-alert-email-enabled');
+    if (emailAlertCb) emailAlertCb.checked = !!cfg.alert_email_enabled;
+
+    const emailToInput = document.getElementById('cfg-alert-email-to');
+    if (emailToInput) emailToInput.value = cfg.alert_email_to || '';
+
+    const smtpUserInput = document.getElementById('cfg-smtp-user');
+    if (smtpUserInput) smtpUserInput.value = cfg.smtp_user || 'apps.monitor.lnx@gmail.com';
+
+    const smtpPwdInput = document.getElementById('cfg-smtp-password');
+    if (smtpPwdInput) {
+      smtpPwdInput.value = '';
+      if (cfg.has_smtp_password) {
+        smtpPwdInput.placeholder = '•••••••••••• (Guardada)';
+      } else {
+        smtpPwdInput.placeholder = '••••••••••••';
+      }
+    }
+
+    const smtpHostInput = document.getElementById('cfg-smtp-host');
+    if (smtpHostInput) smtpHostInput.value = cfg.smtp_host || 'smtp.gmail.com';
+
+    const smtpPortInput = document.getElementById('cfg-smtp-port');
+    if (smtpPortInput) smtpPortInput.value = cfg.smtp_port || 587;
+
+    const cooldownInput = document.getElementById('cfg-alert-cooldown');
+    if (cooldownInput) cooldownInput.value = cfg.alert_cooldown_minutes || 30;
+
+    updateEmailAlertFields();
+
     // Auth type radio
     if (cfg.auth_type === 'password') {
       const radioPwd = document.getElementById('auth-type-password');
@@ -989,6 +1020,14 @@ async function openConfigModal() {
 function closeConfigModal() {
   const modal = document.getElementById('config-modal');
   if (modal) modal.classList.remove('active');
+}
+
+function updateEmailAlertFields() {
+  const isEnabled = document.getElementById('cfg-alert-email-enabled')?.checked;
+  const container = document.getElementById('email-alert-fields');
+  if (container) {
+    container.style.display = isEnabled ? 'block' : 'none';
+  }
 }
 
 function updateAuthTypeFields() {
@@ -1012,8 +1051,75 @@ function getFormData() {
     PVE_VERIFY_SSL: document.getElementById('cfg-verify-ssl')?.checked || false,
     DEMO_MODE: document.getElementById('cfg-demo-mode')?.checked || false,
     FALLBACK_TO_DEMO: document.getElementById('cfg-fallback-demo')?.checked || false,
-    PVE_TIMEOUT: parseFloat(document.getElementById('cfg-timeout')?.value) || 6.0
+    PVE_TIMEOUT: parseFloat(document.getElementById('cfg-timeout')?.value) || 6.0,
+
+    // Email alert settings
+    ALERT_EMAIL_ENABLED: document.getElementById('cfg-alert-email-enabled')?.checked || false,
+    ALERT_EMAIL_TO: document.getElementById('cfg-alert-email-to')?.value.trim() || '',
+    SMTP_USER: document.getElementById('cfg-smtp-user')?.value.trim() || 'apps.monitor.lnx@gmail.com',
+    SMTP_PASSWORD: document.getElementById('cfg-smtp-password')?.value.trim() || '',
+    SMTP_HOST: document.getElementById('cfg-smtp-host')?.value.trim() || 'smtp.gmail.com',
+    SMTP_PORT: parseInt(document.getElementById('cfg-smtp-port')?.value, 10) || 587,
+    ALERT_COOLDOWN_MINUTES: parseInt(document.getElementById('cfg-alert-cooldown')?.value, 10) || 30
   };
+}
+
+async function testEmailAlert() {
+  const btn = document.getElementById('btn-test-email');
+  const icon = document.getElementById('test-email-icon');
+  const statusSpan = document.getElementById('test-email-status');
+  const emailTo = document.getElementById('cfg-alert-email-to')?.value.trim();
+
+  if (!emailTo) {
+    if (statusSpan) {
+      statusSpan.style.color = '#ef4444';
+      statusSpan.textContent = '❌ Ingresa un correo de destino para la prueba.';
+    }
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (icon) icon.className = 'lucide-loader-2 spin';
+  if (statusSpan) {
+    statusSpan.style.color = 'var(--text-secondary)';
+    statusSpan.textContent = 'Enviando correo de prueba vía Gmail...';
+  }
+
+  const payload = {
+    email_to: emailTo,
+    smtp_user: document.getElementById('cfg-smtp-user')?.value.trim() || 'apps.monitor.lnx@gmail.com',
+    smtp_password: document.getElementById('cfg-smtp-password')?.value.trim() || '',
+    smtp_host: document.getElementById('cfg-smtp-host')?.value.trim() || 'smtp.gmail.com',
+    smtp_port: parseInt(document.getElementById('cfg-smtp-port')?.value, 10) || 587
+  };
+
+  try {
+    const res = await fetch('/api/alerts/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      if (statusSpan) {
+        statusSpan.style.color = '#10b981';
+        statusSpan.textContent = `✓ ${result.message}`;
+      }
+    } else {
+      if (statusSpan) {
+        statusSpan.style.color = '#ef4444';
+        statusSpan.textContent = `❌ ${result.message}`;
+      }
+    }
+  } catch (err) {
+    if (statusSpan) {
+      statusSpan.style.color = '#ef4444';
+      statusSpan.textContent = `❌ Error: ${err.message}`;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+    if (icon) icon.className = 'lucide-send';
+  }
 }
 
 async function testConfigConnection() {
@@ -1394,6 +1500,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnSaveConfig = document.getElementById('btn-save-config');
   if (btnSaveConfig) btnSaveConfig.addEventListener('click', saveConfig);
+
+  // Email alert listeners
+  const alertEmailCb = document.getElementById('cfg-alert-email-enabled');
+  if (alertEmailCb) alertEmailCb.addEventListener('change', updateEmailAlertFields);
+
+  const toggleSmtpPwd = document.getElementById('toggle-smtp-pwd');
+  if (toggleSmtpPwd) {
+    toggleSmtpPwd.addEventListener('click', () => {
+      const inp = document.getElementById('cfg-smtp-password');
+      if (inp) {
+        const isPwd = inp.type === 'password';
+        inp.type = isPwd ? 'text' : 'password';
+        toggleSmtpPwd.textContent = isPwd ? '🙈' : '👁';
+      }
+    });
+  }
+
+  const btnTestEmail = document.getElementById('btn-test-email');
+  if (btnTestEmail) btnTestEmail.addEventListener('click', testEmailAlert);
 
   // Auth type radio buttons
   document.querySelectorAll('input[name="AUTH_TYPE"]').forEach(r => {
