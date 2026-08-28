@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Spotlight on Proxmox VE - Enterprise Diagnostics</title>
-  <link rel="stylesheet" href="/static/css/spotlight.css">
+  <link rel="stylesheet" href="/static/css/spotlight.css?v=1.2.0">
   <!-- Lucide Icons CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@0.344.0/font/lucide.min.css">
 </head>
@@ -281,50 +281,51 @@
             </div>
 
             <!-- ======================================================= -->
-            <!-- 🔔 ALERTAS POR CORREO ELECTRÓNICO (GMAIL SMTP)          -->
+            <!-- 🔔 SECCIÓN 4: ALERTAS POR CORREO (GMAIL SMTP)            -->
             <!-- ======================================================= -->
-            <div class="config-card">
-              <div class="config-card-header">
-                <i class="lucide-mail" style="color:var(--alarm-high);"></i>
-                <span>Alertas Urgentes por Correo Electrónico (Gmail)</span>
+            <div class="config-section" id="config-section-email-alerts">
+              <div class="config-section-title">
+                <i class="lucide-mail" style="color:var(--alarm-high);"></i> 4. Alertas Urgentes por Correo Electrónico (Gmail)
               </div>
-              <p class="config-card-desc">
-                Envía notificaciones inmediatas a tu bandeja de correo cuando ocurra un error urgente (caída de nodos, saturación crítica &gt; 95% o desconexión del servidor).
+              <p style="font-size:12px;color:var(--text-secondary);margin:-6px 0 12px 0;">
+                Envía notificaciones inmediatas ante incidentes críticos (nodos caídos, almacenamiento &gt; 95% o pérdida de conexión).
               </p>
 
-              <div class="form-row">
-                <label class="checkbox-container" style="margin-bottom:6px;">
+              <div class="checkbox-grid" style="margin-bottom:12px;">
+                <label class="checkbox-container">
                   <input type="checkbox" id="cfg-alert-email-enabled" name="ALERT_EMAIL_ENABLED">
                   <span class="checkmark"></span>
                   <div class="checkbox-text">
                     <strong>Habilitar envío de alertas por correo</strong>
-                    <span class="field-hint">Activa el motor SRE para despachar alertas ante anomalías críticas.</span>
+                    <span class="field-hint">Activa el motor SRE para despachar correos ante anomalías del clúster.</span>
                   </div>
                 </label>
               </div>
 
-              <div id="email-alert-fields" style="display:none;margin-top:12px;border-top:1px dashed rgba(255,255,255,0.1);padding-top:12px;">
+              <div id="email-alert-fields" style="background:rgba(0,0,0,0.25);padding:14px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);margin-top:8px;">
                 <div class="form-row">
-                  <div class="form-group" style="flex:1;">
+                  <div class="form-group">
                     <label for="cfg-alert-email-to">Correo de Destino de las Alertas:</label>
-                    <input type="email" id="cfg-alert-email-to" name="ALERT_EMAIL_TO" placeholder="ej. admin@tudominio.com">
-                    <span class="field-hint">Dirección que recibirá los correos de alerta urgente.</span>
+                    <input type="email" id="cfg-alert-email-to" name="ALERT_EMAIL_TO" placeholder="ej: admin@empresa.com o tu-correo@gmail.com">
+                    <span class="field-hint">Dirección de correo que recibirá las notificaciones de emergencia.</span>
                   </div>
                 </div>
 
                 <div class="form-row">
-                  <div class="form-group" style="flex:1;">
+                  <div class="form-group">
                     <label for="cfg-smtp-user">Cuenta Gmail Emisora:</label>
                     <input type="email" id="cfg-smtp-user" name="SMTP_USER" value="apps.monitor.lnx@gmail.com">
-                    <span class="field-hint">Cuenta emisora predeterminada de Gmail.</span>
+                    <span class="field-hint">Cuenta de Gmail configurada para emitir los correos.</span>
                   </div>
-                  <div class="form-group" style="flex:1;">
-                    <label for="cfg-smtp-password">Contraseña de Aplicación Gmail:</label>
-                    <div class="input-with-action">
-                      <input type="password" id="cfg-smtp-password" name="SMTP_PASSWORD" placeholder="••••••••">
-                      <button type="button" class="field-toggle-pwd" id="toggle-smtp-pwd" title="Mostrar/Ocultar contraseña">👁</button>
+                  <div class="form-group">
+                    <label for="cfg-smtp-password">Contraseña de Aplicación de Gmail:</label>
+                    <div class="input-password-wrapper">
+                      <input type="password" id="cfg-smtp-password" name="SMTP_PASSWORD" placeholder="••••••••••••">
+                      <button type="button" class="toggle-password-btn" data-target="cfg-smtp-password" title="Mostrar/Ocultar contraseña">
+                        <i class="lucide-eye"></i>
+                      </button>
                     </div>
-                    <span class="field-hint">Contraseña de aplicación de 16 caracteres generada en Google.</span>
+                    <span class="field-hint">Contraseña de aplicación de 16 caracteres de Google.</span>
                   </div>
                 </div>
 
@@ -333,18 +334,18 @@
                     <label for="cfg-smtp-host">Servidor SMTP:</label>
                     <input type="text" id="cfg-smtp-host" name="SMTP_HOST" value="smtp.gmail.com">
                   </div>
-                  <div class="form-group" style="flex:1;">
+                  <div class="form-group" style="flex:1;max-width:110px;">
                     <label for="cfg-smtp-port">Puerto:</label>
                     <input type="number" id="cfg-smtp-port" name="SMTP_PORT" value="587">
                   </div>
-                  <div class="form-group" style="flex:1;">
+                  <div class="form-group" style="flex:1;max-width:140px;">
                     <label for="cfg-alert-cooldown">Cooldown (min):</label>
                     <input type="number" id="cfg-alert-cooldown" name="ALERT_COOLDOWN_MINUTES" min="1" max="1440" value="30">
                   </div>
                 </div>
 
-                <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                  <button type="button" id="btn-test-email" class="action-btn action-btn-test" style="background:rgba(239,68,68,0.15);border-color:var(--alarm-critical);color:#fca5a5;">
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                  <button type="button" id="btn-test-email" class="action-btn action-btn-test" style="background:rgba(239,68,68,0.15);border:1px solid var(--alarm-critical);color:#fca5a5;">
                     <i id="test-email-icon" class="lucide-send"></i> Enviar Correo de Prueba
                   </button>
                   <span id="test-email-status" style="font-size:12px;color:var(--text-secondary);"></span>
@@ -533,6 +534,6 @@
 
   </div>
 
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=1.2.0"></script>
 </body>
 </html>

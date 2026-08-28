@@ -1026,7 +1026,10 @@ function updateEmailAlertFields() {
   const isEnabled = document.getElementById('cfg-alert-email-enabled')?.checked;
   const container = document.getElementById('email-alert-fields');
   if (container) {
-    container.style.display = isEnabled ? 'block' : 'none';
+    container.style.opacity = isEnabled ? '1.0' : '0.45';
+    container.style.pointerEvents = isEnabled ? 'auto' : 'none';
+    container.style.filter = isEnabled ? 'none' : 'grayscale(0.5)';
+    container.style.transition = 'opacity 0.25s ease, filter 0.25s ease';
   }
 }
 
