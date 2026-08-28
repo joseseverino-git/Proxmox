@@ -188,6 +188,17 @@ chmod 775 "${DEST_DIR}/data" 2>/dev/null || true
 find "${DEST_DIR}/scripts" -type f -name "*.sh" -exec chmod +x {} + 2>/dev/null || true
 [ -f "${DEST_DIR}/install_offline.sh" ] && chmod +x "${DEST_DIR}/install_offline.sh" 2>/dev/null || true
 
+# Sincronizar desde subcarpeta Dashboard si existe (creada por git clone o tar anidado)
+if [ -d "${DEST_DIR}/Dashboard/app" ]; then
+    echo -e "  [+] Sincronizando archivos actualizados desde Dashboard/ hacia app/..."
+    cp -rf "${DEST_DIR}/Dashboard/app/"* "${DEST_DIR}/app/"
+    [ -f "${DEST_DIR}/Dashboard/docker-compose.yml" ] && cp -f "${DEST_DIR}/Dashboard/docker-compose.yml" "${DEST_DIR}/docker-compose.yml"
+    [ -f "${DEST_DIR}/Dashboard/Dockerfile" ] && cp -f "${DEST_DIR}/Dashboard/Dockerfile" "${DEST_DIR}/Dockerfile"
+    [ -f "${DEST_DIR}/Dashboard/requirements.txt" ] && cp -f "${DEST_DIR}/Dashboard/requirements.txt" "${DEST_DIR}/requirements.txt"
+    [ -d "${DEST_DIR}/Dashboard/scripts" ] && cp -rf "${DEST_DIR}/Dashboard/scripts/"* "${DEST_DIR}/scripts/"
+    log_ok "Archivos del aplicativo consolidados en la raíz de producción."
+fi
+
 # 4. Despliegue en Docker
 log_step "4. Desplegando Contenedor Docker en Producción"
 
@@ -207,6 +218,10 @@ $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
 echo -e "  [+] ${BOLD}Limpiando contenedor huérfano (docker rm -f proxmox-spotlight-dashboard)...${NC}"
 docker rm -f proxmox-spotlight-dashboard 2>/dev/null || true
 log_ok "Nombre de contenedor liberado sin conflictos."
+
+echo -e "  [+] ${BOLD}Eliminando imágenes Docker anteriores para forzar reconstrucción limpia...${NC}"
+docker rmi -f $(docker images -q "*spotlight*") 2>/dev/null || true
+docker rmi -f $(docker images -q "*dashboard*") 2>/dev/null || true
 
 echo -e "  [+] Recompilando imagen Docker sin caché..."
 $COMPOSE_CMD build --no-cache

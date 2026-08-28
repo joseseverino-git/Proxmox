@@ -20,14 +20,30 @@ if (Test-Path $outputTar) {
 }
 
 New-Item -ItemType Directory -Path $tempDir | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard") | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/app") | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/app/static") | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/data") | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/scripts") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $tempDir "app") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $tempDir "data") | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $tempDir "scripts") | Out-Null
 
-# Copiar archivos principales de la aplicación (excluyendo __pycache__)
+New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/app") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/data") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $tempDir "Dashboard/scripts") | Out-Null
+
+# 1. Copiar a la raíz del paquete (para desempaque directo en ~/Dashboard)
+Get-ChildItem -Path (Join-Path $projectRoot "Dashboard/app") -Exclude "__pycache__" | Copy-Item -Destination (Join-Path $tempDir "app/") -Recurse -Force
+Copy-Item -Force (Join-Path $projectRoot "Dashboard/Dockerfile") (Join-Path $tempDir "")
+Copy-Item -Force (Join-Path $projectRoot "Dashboard/docker-compose.yml") (Join-Path $tempDir "")
+Copy-Item -Force (Join-Path $projectRoot "Dashboard/requirements.txt") (Join-Path $tempDir "")
+Copy-Item -Force (Join-Path $projectRoot "Dashboard/.env.example") (Join-Path $tempDir "")
+Copy-Item -Force (Join-Path $projectRoot "Dashboard/setup_proxmox_guide.md") (Join-Path $tempDir "")
+Copy-Item -Force (Join-Path $projectRoot "Dashboard/README.md") (Join-Path $tempDir "")
+Copy-Item -Recurse -Force (Join-Path $projectRoot "scripts/*") (Join-Path $tempDir "scripts/")
+Copy-Item -Force (Join-Path $projectRoot "scripts/install_offline.sh") (Join-Path $tempDir "install_offline.sh")
+Copy-Item -Force (Join-Path $projectRoot "scripts/install_offline.sh") (Join-Path $tempDir "install.sh")
+Copy-Item -Force (Join-Path $projectRoot "scripts/deploy_to_destination.sh") (Join-Path $tempDir "deploy_to_destination.sh")
+Copy-Item -Force (Join-Path $projectRoot "README.md") (Join-Path $tempDir "README.md")
+
+# 2. Copiar también dentro de subcarpeta Dashboard/ (compatibilidad retroactiva si alguien descomprime esperando Dashboard/)
 Get-ChildItem -Path (Join-Path $projectRoot "Dashboard/app") -Exclude "__pycache__" | Copy-Item -Destination (Join-Path $tempDir "Dashboard/app/") -Recurse -Force
 Copy-Item -Force (Join-Path $projectRoot "Dashboard/Dockerfile") (Join-Path $tempDir "Dashboard/")
 Copy-Item -Force (Join-Path $projectRoot "Dashboard/docker-compose.yml") (Join-Path $tempDir "Dashboard/")
@@ -35,14 +51,9 @@ Copy-Item -Force (Join-Path $projectRoot "Dashboard/requirements.txt") (Join-Pat
 Copy-Item -Force (Join-Path $projectRoot "Dashboard/.env.example") (Join-Path $tempDir "Dashboard/")
 Copy-Item -Force (Join-Path $projectRoot "Dashboard/setup_proxmox_guide.md") (Join-Path $tempDir "Dashboard/")
 Copy-Item -Force (Join-Path $projectRoot "Dashboard/README.md") (Join-Path $tempDir "Dashboard/")
-Copy-Item -Recurse -Force (Join-Path $projectRoot "Dashboard/scripts/*") (Join-Path $tempDir "Dashboard/scripts/")
-Copy-Item -Recurse -Force (Join-Path $projectRoot "scripts/*") (Join-Path $tempDir "scripts/")
-Copy-Item -Force (Join-Path $projectRoot "scripts/install_offline.sh") (Join-Path $tempDir "install_offline.sh")
-Copy-Item -Force (Join-Path $projectRoot "scripts/install_offline.sh") (Join-Path $tempDir "install.sh")
-Copy-Item -Force (Join-Path $projectRoot "scripts/deploy_to_destination.sh") (Join-Path $tempDir "deploy_to_destination.sh")
-Copy-Item -Force (Join-Path $projectRoot "README.md") (Join-Path $tempDir "README.md")
+Copy-Item -Recurse -Force (Join-Path $projectRoot "scripts/*") (Join-Path $tempDir "Dashboard/scripts/")
 
-# Normalizar saltos de línea (CRLF a LF) en todos los scripts shell para evitar errores de sintaxis en Linux
+# Normalizar saltos de línea (CRLF a LF) en todos los scripts shell para evitar errores en Linux
 Get-ChildItem -Path $tempDir -Filter "*.sh" -Recurse | ForEach-Object {
     $content = [System.IO.File]::ReadAllText($_.FullName)
     $normalized = $content.Replace("`r`n", "`n")

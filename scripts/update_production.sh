@@ -195,26 +195,41 @@ fi
 # Crear directorio ./data para la persistencia de configuración del aplicativo
 mkdir -p "${WORK_DIR}/data"
 chmod 775 "${WORK_DIR}/data" 2>/dev/null || true
-log_ok "Directorio de persistencia ./data preparado y asegurado."
+# Sincronizar desde subcarpeta Dashboard si existe (originada por git clone o tar)
+if [ -d "${WORK_DIR}/Dashboard/app" ]; then
+    echo -e "  [+] Sincronizando archivos actualizados desde subcarpeta Dashboard/..."
+    cp -rf "${WORK_DIR}/Dashboard/app/"* "${WORK_DIR}/app/"
+    [ -f "${WORK_DIR}/Dashboard/docker-compose.yml" ] && cp -f "${WORK_DIR}/Dashboard/docker-compose.yml" "${WORK_DIR}/docker-compose.yml"
+    [ -f "${WORK_DIR}/Dashboard/Dockerfile" ] && cp -f "${WORK_DIR}/Dashboard/Dockerfile" "${WORK_DIR}/Dockerfile"
+    [ -f "${WORK_DIR}/Dashboard/requirements.txt" ] && cp -f "${WORK_DIR}/Dashboard/requirements.txt" "${WORK_DIR}/requirements.txt"
+    [ -d "${WORK_DIR}/Dashboard/scripts" ] && cp -rf "${WORK_DIR}/Dashboard/scripts/"* "${WORK_DIR}/scripts/"
+    log_ok "Archivos actualizados consolidados en la raíz del proyecto."
+fi
 
 # ==============================================================================
 # PASO 4: Compilación y Despliegue con Docker Compose
 # ==============================================================================
 log_step "4. Recompilando y Desplegando Contenedor Actualizado"
 
-echo -e "  ${DIM}Construyendo imagen optimizada con Python 3.11-slim y Web UI HUD...${NC}"
+echo -e "  ${DIM}Deteniendo contenedores antiguos...${NC}"
+$COMPOSE_CMD down --remove-orphans 2>/dev/null || true
 
-if $COMPOSE_CMD build; then
-    log_ok "Compilación de imagen completada exitosamente."
+echo -e "  ${DIM}Garantizando liberación de nombre de contenedor (docker rm -f proxmox-spotlight-dashboard)...${NC}"
+docker rm -f proxmox-spotlight-dashboard 2>/dev/null || true
+
+echo -e "  ${DIM}Eliminando imágenes Docker anteriores para forzar reconstrucción limpia...${NC}"
+docker rmi -f $(docker images -q "*spotlight*") 2>/dev/null || true
+docker rmi -f $(docker images -q "*dashboard*") 2>/dev/null || true
+
+echo -e "  ${DIM}Construyendo imagen optimizada sin caché (--no-cache)...${NC}"
+if $COMPOSE_CMD build --no-cache; then
+    log_ok "Compilación de imagen completada exitosamente sin caché."
 else
-    log_err "Fallo al compilar la imagen Docker. Restaurando backup..."
+    log_err "Fallo al compilar la imagen Docker."
     exit 1
 fi
 
-echo -e "  ${DIM}Iniciando servicio con recarga limpia de contenedores...${NC}"
-$COMPOSE_CMD down --remove-orphans 2>/dev/null || true
-echo -e "  ${DIM}Garantizando liberación de nombre de contenedor (docker rm -f proxmox-spotlight-dashboard)...${NC}"
-docker rm -f proxmox-spotlight-dashboard 2>/dev/null || true
+echo -e "  ${DIM}Iniciando servicio en segundo plano...${NC}"
 $COMPOSE_CMD up -d --remove-orphans
 
 log_ok "Contenedor iniciado en segundo plano sin conflictos de nombre."
